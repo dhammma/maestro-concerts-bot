@@ -11,6 +11,9 @@ load_dotenv()
 bot = telebot.TeleBot(os.environ.get('TELEGRAM_TOKEN'))
 font = ImageFont.truetype(r'Montserrat-Regular.ttf', 96)
 
+user_states = {}
+user_tickets = {}
+
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     bot.reply_to(message, 'Привіт')
@@ -44,7 +47,113 @@ def callback_message_handler(message):
             draw.text((box[0], box[1] + qr_height + 20), full_name, font = font)
 
             bot.send_photo(message.from_user.id, img)
+
+            if message.from_user.id not in user_tickets:
+                user_tickets[message.from_user.id] = [full_name]
+
+            markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
+            btn1 = types.KeyboardButton('Купити ще')
+            btn2 = types.KeyboardButton('Мої квитки')
+            btn3 = types.KeyboardButton('Поділитись')
+            markup.add(btn1, btn2, btn3)
+
+            bot.send_message(message.from_user.id, 'Що хочете зробити далі?', reply_markup=markup)
             # bot.send_message(message.from_user.id, full_name)
             # bot.send_photo(message.from_user.id, file)
+
+@bot.message_handler(func=lambda message: message.text == 'Купити ще')
+def buy_more(message):
+    user_states[message.chat.id] = 'buy_more'
+    markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
+    btn1 = types.KeyboardButton('Fan Zone')
+    btn2 = types.KeyboardButton('VIP Zone 1')
+    btn3 = types.KeyboardButton('VIP Zone 2')
+    btn_back = types.KeyboardButton('Назад')
+
+    markup.add(btn1, btn2, btn3)
+    markup.add(btn_back)
+    bot.send_message(message.chat.id, 'Оберіть, будь ласка, квитки:', reply_markup=markup)
+
+@bot.message_handler(func=lambda message: message.text == 'Мої квитки')
+def show_tickets(message):
+    tickets = user_tickets.get(message.from_user.id, [])
+    if tickets:
+        ticket_list = '\n'.join(tickets)
+        bot.send_message(message.chat.id, f'Ваші квитки:\n{ticket_list}')
+    else:
+        bot.send_message(message.chat.id, 'У вас ще немає квитків.')
+
+@bot.message_handler(func=lambda message: message.text == 'Поділитись')
+def share_ticket(message):
+    tickets = user_tickets.get(message.from_user.id, [])
+    if tickets:
+        ticket_info = '\n'.join(tickets)
+        share_message = f'У мене є такі квитки:\n{ticket_info}\nПоділіться зі своїми друзями!'
+        bot.send_message(message.chat.id, share_message)
+    else:
+        bot.send_message(message.chat.id, 'У вас немає квитків, щоб поділитися.')
+
+@bot.message_handler(func=lambda message: message.text in ['Fan Zone', 'VIP Zone 1', 'VIP Zone 2'])
+def select_zone(message):
+    selected_zone = message.text
+    user_states[message.chat.id] = 'zone_selected'
+
+    markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
+    btn1 = types.KeyboardButton('PrivatBank')
+    btn2 = types.KeyboardButton('Monobank')
+    btn3 = types.KeyboardButton('Ощадбанк')
+    btn_back = types.KeyboardButton('Назад')
+    btn_cancel = types.KeyboardButton('Скасувати')
+
+    markup.add(btn1, btn2, btn3)
+    markup.add(btn_back, btn_cancel)
+
+    bot.send_message(message.chat.id, f'Ви обрали: {selected_zone}\nОберіть спосіб оплати:', reply_markup=markup)
+
+@bot.message_handler(func=lambda message: message.text in ['PrivatBank', 'Monobank', 'Ощадбанк'])
+def payment_metod(message):
+    selected_metod = message.text
+
+    bot.send_message(message.chat.id, f'Ви обрали: {selected_metod}\nЩе не реалізовано')
+
+@bot.message_handler(func=lambda message: message.text == 'Назад' and user_states.get(message.chat.id) == 'buy_more')
+def go_back_from_payment(message):
+    user_states[message.chat.id] = 'main_menu'
+    markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
+    btn1 = types.KeyboardButton('Купити ще')
+    btn2 = types.KeyboardButton('Мої квитки')
+    btn3 = types.KeyboardButton('Поділитись')
+
+    markup.add(btn1, btn2, btn3)
+
+    bot.send_message(message.chat.id, 'Що хочете зробити далі?', reply_markup=markup)
+
+@bot.message_handler(func=lambda message: message.text == 'Назад' and user_states.get(message.chat.id) == 'zone_selected')
+def go_back_from_selection(message):
+    user_states[message.chat.id] = 'buy_more'
+    markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
+    btn1 = types.KeyboardButton('Fan Zone')
+    btn2 = types.KeyboardButton('VIP Zone 1')
+    btn3 = types.KeyboardButton('VIP Zone 2')
+    btn_back = types.KeyboardButton('Назад')
+
+    markup.add(btn1, btn2, btn3)
+    markup.add(btn_back)
+
+    bot.send_message(message.chat.id, 'Оберіть, будь ласка, квитки:', reply_markup=markup)
+
+@bot.message_handler(func=lambda message: message.text == 'Скасувати')
+def cancel_operation(message):
+    user_states[message.chat.id] = 'main_menu'
+
+    markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
+    btn1 = types.KeyboardButton('Купити ще')
+    btn2 = types.KeyboardButton('Мої квитки')
+    btn3 = types.KeyboardButton('Поділитись')
+
+    markup.add(btn1, btn2, btn3)
+
+    bot.send_message(message.chat.id, 'Операцію скасовано. Що хочете зробити далі?', reply_markup=markup)
+
 
 bot.infinity_polling()
