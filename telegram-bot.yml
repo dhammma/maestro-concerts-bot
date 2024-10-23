@@ -31,4 +31,4 @@ services:
   instance_size_slug: basic-xxs
   name: polling-bot
   run_command: cd src && python main.py
-  source_dir: /src
+  source_dir: /
