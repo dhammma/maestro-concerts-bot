@@ -1,4 +1,1 @@
-Pillow
-segno
-pyTelegramBotAPI
-python-dotenv
+Pillow segno pyTelegramBotAPI python-dotenv
